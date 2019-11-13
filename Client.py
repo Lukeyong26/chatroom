@@ -73,6 +73,7 @@ while True:
             privateClient, pteClientAddr = cServer_socket.accept()
             readables.append(privateClient)
             pteClientName = privateClient.recv(BUFFSIZE).decode("utf8").strip()
+            p2pClients[pteClientName] = privateClient
             
             print(pteClientName)
         # Read from std in
@@ -81,14 +82,28 @@ while True:
             if line.split(None, 1)[0] == "private":
                 user = line.split(None, 3)[1]
                 msg = line.split(None, 3)[2]
-                
-                p2pClients[user].send(bytes(f"[{username} (private)]: " + msg, "utf8"))
+                if user in p2pClients:
+                    p2pClients[user].send(bytes(f"[{username} (private)]: " + msg, "utf8"))
+            elif line.split(None, 1)[0] == "stopprivate":
+                user = line.split(None, 2)[1]
+                if user in p2pClients:
+                    p2pClients[user].send(bytes(f"[KILLME] {username}", "utf8"))
+                    p2pClients[user].close()
+                    readables.remove(p2pClients[user])
+                    del p2pClients[user]
             else:    
                 client_socket.send(bytes(f"{line}", "utf8"))
         # Other sockets in the list (created by p2p connections)
         else:
             msg = sock.recv(BUFFSIZE).decode("utf8").strip()
-            print("something" + msg)
+            if msg.split(None, 1)[0] == "[KILLME]":
+                user = msg.split(None, 2)[1]
+                if user in p2pClients:
+                    p2pClients[user].close()
+                    readables.remove(p2pClients[user])
+                    del p2pClients[user]
+            else:
+                print(msg)
 
 
             

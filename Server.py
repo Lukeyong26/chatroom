@@ -103,6 +103,7 @@ def handleConnection(client):
 
     # Client has logged in
     onlineClients[client] = name
+    clients[name].setlastLogged(datetime.now().timestamp())
 
     # Send welcome msg upon success
     welcome = f"Welcome {name}!\n" 
@@ -137,8 +138,8 @@ def handleConnection(client):
             logout = f"*{name}* has logged out"
             broadcast(logout, "Server", client)
             client.send(bytes("[logout]", "utf8"))
-            client.close()
             clients[name].setlastLogged(datetime.now().timestamp())
+            client.close()
             del addresses[client]
             del onlineClients[client]
 
@@ -162,8 +163,8 @@ def handleConnection(client):
         elif msgComd == "whoelse":
             online = getWhoElse(name)
             client.send(bytes(online, "utf8"))
-        elif msgComd == " whoelsesince":
-            if len(recv.split(None, -1)) < 1:
+        elif msgComd == "whoelsesince":
+            if len(recv.split(None, -1)) < 2:
                 client.send(bytes("Usage: whoelsesince <time>", "utf8"))
             else:
                 time = int(recv.split(None, 1)[1].strip())
@@ -227,7 +228,7 @@ def getWhoElse(thisName):
     
     return onlineMembers
 
-def getWhoElseTime(thisName, time):
+def getWhoElseTime(thisName, duration):
     onlineMembers = ""
     now = datetime.now().timestamp()
     for client in clients:
@@ -236,7 +237,7 @@ def getWhoElseTime(thisName, time):
         if clients[client].getlastLogged() == None or clients[client].getname() == thisName:
             continue
         timeOnline = int(now - clients[client].getlastLogged())
-        if timeOnline < time:
+        if timeOnline < duration:
             mem = "*" + clients[client].getname() + "* logged in " + str(timeOnline) + " seconds ago\n"
             onlineMembers += mem
 
@@ -254,6 +255,7 @@ def broadcast(msg, name="", thisClient= None):
                 continue
         if client != thisClient:   
             client.send(bytes("[" + name + "]: " + msg, "utf8"))
+            
 
 def isBlocked(recv, send):
     return send in clients[recv].getblacklist()
