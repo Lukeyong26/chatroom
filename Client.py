@@ -51,6 +51,10 @@ while True:
             elif tag == "[logout]":
                 client_socket.shutdown(SHUT_RDWR)
                 client_socket.close()
+                for client in p2pClients:
+                    p2pClients[client].send(bytes(f"[KILLME] {username}", "utf8"))
+                    p2pClients[client].close()
+                
                 exit()
             # Implies user seting up P2P connection
             elif tag == "[IP,PORT]":
@@ -58,7 +62,8 @@ while True:
                 server_ip = msg.split(None, 4)[2].strip()
                 server_port = msg.split(None, 4)[3].strip()
                 TRGADDR = (server_ip, int(server_port))
-                print(name + " " + server_ip + server_port)
+                # print(name + " " + server_ip + server_port)
+                
                 
                 pteConn_socket = socket(AF_INET, SOCK_STREAM)
                 pteConn_socket.connect(TRGADDR)
@@ -66,6 +71,7 @@ while True:
 
                 p2pClients[name] = pteConn_socket
                 readables.append(pteConn_socket)
+                print(f"successfully started a private connection to {name}")
             else:
                 print(msg)
         # Implies Incoming private connection
@@ -75,7 +81,7 @@ while True:
             pteClientName = privateClient.recv(BUFFSIZE).decode("utf8").strip()
             p2pClients[pteClientName] = privateClient
             
-            print(pteClientName)
+            # print(pteClientName)
         # Read from std in
         elif sock == sys.stdin:
             line = sys.stdin.readline()
@@ -84,6 +90,8 @@ while True:
                 msg = line.split(None, 3)[2]
                 if user in p2pClients:
                     p2pClients[user].send(bytes(f"[{username} (private)]: " + msg, "utf8"))
+                else:
+                    print(f"No private connection to {user}")
             elif line.split(None, 1)[0] == "stopprivate":
                 user = line.split(None, 2)[1]
                 if user in p2pClients:
@@ -91,6 +99,9 @@ while True:
                     p2pClients[user].close()
                     readables.remove(p2pClients[user])
                     del p2pClients[user]
+                    print(f"Successfully storped private connection to {user}")
+                else:
+                    print(f"No existing private connection to {user}")
             else:    
                 client_socket.send(bytes(f"{line}", "utf8"))
         # Other sockets in the list (created by p2p connections)

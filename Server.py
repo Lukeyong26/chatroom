@@ -68,13 +68,11 @@ def handleConnection(client):
     buffer.sleep(0.1)
 
     # Check username
-    while name not in creds:
-        client.send(bytes("Username not in database\n", "utf8"))
-        client.send(bytes("Enter usernaname: ", "utf8"))
-        name = client.recv(BUFFSIZE).decode("utf8").strip()
-
-    while name in onlineClients:
-        client.send(bytes("User already logged in\n", "utf8"))
+    while name not in creds or inonline(name):
+        if name not in creds:
+            client.send(bytes("Username not in database\n", "utf8"))  
+        elif inonline(name):
+            client.send(bytes("User already logged in\n", "utf8"))
         client.send(bytes("Enter usernaname: ", "utf8"))
         name = client.recv(BUFFSIZE).decode("utf8").strip()
     
@@ -199,14 +197,10 @@ def handleConnection(client):
             else:
                 user = recv.split(None, 2)[1].strip()
                 startPrivate(user, client)
-
-        elif msgComd == "test":
-            test()
+        else:
+            client.send(bytes("Error. Invalid Command", "utf8"))
 
 # Server functions -----------------------------------------------
-def test():
-    for address in addresses:
-        print(addresses[address])
 
 def personalmsg(recvName, msg, sendName):
     for client in onlineClients:
@@ -237,8 +231,8 @@ def getWhoElseTime(thisName, duration):
         if clients[client].getlastLogged() == None or clients[client].getname() == thisName:
             continue
         timeOnline = int(now - clients[client].getlastLogged())
-        if timeOnline < duration:
-            mem = "*" + clients[client].getname() + "* logged in " + str(timeOnline) + " seconds ago\n"
+        if inonline(client) or timeOnline < duration:
+            mem = clients[client].getname()
             onlineMembers += mem
 
     return onlineMembers
@@ -261,11 +255,27 @@ def isBlocked(recv, send):
     return send in clients[recv].getblacklist()
 
 def startPrivate(name, thisClient):
+    thisClientName = onlineClients[thisClient]
+    if name == thisClientName:
+            thisClient.send(bytes(f"Can't connect to {name} as this user is YOU", "utf8"))   
+            return
     for client in onlineClients:
         if onlineClients[client] == name:
-            addr = addresses[client]
-            
-            thisClient.send(bytes(f"[IP,PORT] {name} {addr}", "utf8"))
+            if isBlocked(name, thisClientName):
+                thisClient.send(bytes(f"Can't connect to {name} as this user has blocked you", "utf8"))
+            else:
+                addr = addresses[client]
+                thisClient.send(bytes(f"[IP,PORT] {name} {addr}", "utf8"))
+            return
+    # End of for loop with no return impliess user not online
+    thisClient.send(bytes(f"Can't connect to {name} as this user is offline or does not exist", "utf8"))    
+
+def inonline(name):
+    for client in onlineClients:
+        if name == onlineClients[client]:
+            return True
+    return False
+
 
 # CLOCK FOR TIMEOUT AND BLOCKOUT--------------------------------
 def activateClock():
