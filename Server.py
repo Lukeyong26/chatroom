@@ -21,6 +21,8 @@ TIMEOUT = int(sys.argv[3])
 
 buffer = time
 
+svr = "[SERVER]: "
+
 clients = {}
 onlineClients = {}
 addresses = {}
@@ -44,6 +46,7 @@ def accept_connections():
     
     while True:
         print("waiting for clients")
+        print("To close server, please use Ctrl + c")
         client, clientAddr = serverSocket.accept()
         print(f"{clientAddr} has connected")
 
@@ -61,50 +64,48 @@ def handleConnection(client):
     passwordCheck = 0
 
     # Prompt for username
-    client.send(bytes("Enter usernaname: ", "utf8"))
+    client.send(bytes(svr + "Enter usernaname: ", "utf8"))
     name = client.recv(BUFFSIZE).decode("utf8").strip()
-
-    client.send(bytes(f"[yourName] {name}", "utf8"))
-    buffer.sleep(0.1)
-
     # Check username
     while name not in creds or inonline(name):
         if name not in creds:
-            client.send(bytes("Username not in database\n", "utf8"))  
+            client.send(bytes(svr + "Username not in database\n", "utf8"))  
         elif inonline(name):
-            client.send(bytes("User already logged in\n", "utf8"))
-        client.send(bytes("Enter usernaname: ", "utf8"))
+            client.send(bytes(svr + "User already logged in\n", "utf8"))
+        client.send(bytes(svr + "Enter usernaname: ", "utf8"))
         name = client.recv(BUFFSIZE).decode("utf8").strip()
     
     if clients[name].isblockout():
-        client.send(bytes("You are blocked out ", "utf8"))
+        client.send(bytes(svr + "You are blocked out ", "utf8"))
         buffer.sleep(1)
         client.send(bytes("[logout]", "utf8"))
         client.close()
         return
 
     # Check password
-    client.send(bytes("Enter password: ", "utf8"))
+    client.send(bytes(svr + "Enter password: ", "utf8"))
     password = client.recv(BUFFSIZE).decode("utf8").strip()
     while creds[name] != password:
         passwordCheck += 1
         if passwordCheck == 3:
-            client.send(bytes(f"You are blocked out for {BLOCKOUT} seconds", "utf8"))
+            client.send(bytes(svr + f"You are blocked out for {BLOCKOUT} seconds", "utf8"))
             buffer.sleep(1)
             clients[name].setblockout(datetime.now().timestamp())
             client.send(bytes("[logout]", "utf8"))
             client.close()
             return
-        client.send(bytes("Incorrect password, try again\n", "utf8"))
-        client.send(bytes("Enter password: ", "utf8"))
+        client.send(bytes(svr + "Incorrect password, try again\n", "utf8"))
+        client.send(bytes(svr + "Enter password: ", "utf8"))
         password = client.recv(BUFFSIZE).decode("utf8").strip()
 
     # Client has logged in
     onlineClients[client] = name
     clients[name].setlastLogged(datetime.now().timestamp())
+    client.send(bytes(f"[yourName] {name}", "utf8"))
+    buffer.sleep(0.1)
 
     # Send welcome msg upon success
-    welcome = f"Welcome {name}!\n" 
+    welcome = svr +  f"Welcome {name} to the *cough* 'greatest' messaging application ever!\n" 
     client.send(bytes(welcome, "utf8"))
 
     # Send any stored messages
@@ -114,7 +115,7 @@ def handleConnection(client):
 
     # Broadcast login to all online users
     presense = f"*{name}* has joined the server"
-    broadcast(presense, "Server", client)
+    broadcast(presense, "SERVER", client)
 
     # Set timeout
     clients[name].settimeout(datetime.now().timestamp())
@@ -134,7 +135,7 @@ def handleConnection(client):
         # LOGOUT
         if msgComd == "logout":
             logout = f"*{name}* has logged out"
-            broadcast(logout, "Server", client)
+            broadcast(logout, "SERVER", client)
             client.send(bytes("[logout]", "utf8"))
             clients[name].setlastLogged(datetime.now().timestamp())
             client.close()
@@ -145,12 +146,12 @@ def handleConnection(client):
         # MESSAGE
         elif msgComd == "message":
             if len(recv.split(None, -1)) < 3:
-                client.send(bytes("Usage: massage <user> <message>", "utf8"))
+                client.send(bytes(svr + "Usage: massage <user> <message>", "utf8"))
             else:
                 recvName = recv.split(None, 2)[1].strip()
                 msg = recv.split(None, 2)[2].strip()
                 if isBlocked(recvName, name):
-                    client.send(bytes("Couldn't send message to " + recvName, "utf8"))
+                    client.send(bytes(svr + "Couldn't send message to " + recvName, "utf8"))
                 else:
                     personalmsg(recvName, msg, name)
         # BROADCAST
@@ -163,7 +164,7 @@ def handleConnection(client):
             client.send(bytes(online, "utf8"))
         elif msgComd == "whoelsesince":
             if len(recv.split(None, -1)) < 2:
-                client.send(bytes("Usage: whoelsesince <time>", "utf8"))
+                client.send(bytes(svr + "Usage: whoelsesince <time>", "utf8"))
             else:
                 time = int(recv.split(None, 1)[1].strip())
                 onlineTime = getWhoElseTime(name, time)
@@ -171,34 +172,42 @@ def handleConnection(client):
         # BLOCK
         elif msgComd == "block":
             if len(recv.split(None, -1)) < 2:
-                client.send(bytes("Usage: block <user>", "utf8"))
+                client.send(bytes(svr + "Usage: block <user>", "utf8"))
             else:
                 blockname = recv.split(None, 2)[1].strip()
-                if blockname not in clients or blockname == name:
-                    client.send(bytes("User not found", "utf8"))
+                if blockname not in clients:
+                    client.send(bytes(svr + "User not found", "utf8"))
+                elif blockname == name:
+                    client.send(bytes(svr + "Cannot block self", "utf8"))
                 else:
-                    clients[name].addblacklist(blockname)
-                    client.send(bytes(f"Successfully blocked *{blockname}*", "utf8"))
+                    if clients[name].addblacklist(blockname):
+                        client.send(bytes(svr + f"Successfully blocked *{blockname}*", "utf8"))
+                    else:
+                        client.send(bytes(svr + f"*{blockname}* already blocked", "utf8"))
         # UNBLOCK
         elif msgComd == "unblock":
             if len(recv.split(None, -1)) < 2:
-                client.send(bytes("Usage: unblock <user>", "utf8"))
+                client.send(bytes(svr + "Usage: unblock <user>", "utf8"))
             else:
                 blockname = recv.split(None, 2)[1].strip()
-                if blockname not in clients or blockname == name:
-                    client.send(bytes("User not found", "utf8"))
+                if blockname not in clients:
+                    client.send(bytes(svr + "User not found", "utf8"))
+                elif blockname == name:
+                    client.send(bytes(svr + "Cannot unblock self", "utf8"))
                 else:
-                    clients[name].removeblacklist(blockname)
-                    client.send(bytes(f"Successfully unblocked *{blockname}*", "utf8"))
+                    if clients[name].removeblacklist(blockname):
+                        client.send(bytes(svr + f"Successfully unblocked *{blockname}*", "utf8"))
+                    else:
+                        client.send(bytes(svr + f"*{blockname}* was not blocked", "utf8"))
         # START P2P
         elif msgComd == "startprivate":
             if len(recv.split(None, -1)) < 2:
-                client.send(bytes("Usage: startprivate <user>", "utf8"))
+                client.send(bytes(svr + "Usage: startprivate <user>", "utf8"))
             else:
                 user = recv.split(None, 2)[1].strip()
                 startPrivate(user, client)
         else:
-            client.send(bytes("Error. Invalid Command", "utf8"))
+            client.send(bytes(svr + "Error. Invalid Command", "utf8"))
 
 # Server functions -----------------------------------------------
 
@@ -218,7 +227,7 @@ def getWhoElse(thisName):
         if isBlocked(clientName, thisName):
             continue
         if clientName != thisName:
-            onlineMembers += onlineClients[client] + "\n"
+            onlineMembers += svr + onlineClients[client] + "\n"
     
     return onlineMembers
 
@@ -232,7 +241,7 @@ def getWhoElseTime(thisName, duration):
             continue
         timeOnline = int(now - clients[client].getlastLogged())
         if inonline(client) or timeOnline < duration:
-            mem = clients[client].getname()
+            mem = svr + clients[client].getname() + "\n"
             onlineMembers += mem
 
     return onlineMembers
@@ -241,7 +250,7 @@ def broadcast(msg, name="", thisClient= None):
     thisClientName = onlineClients[thisClient]
     for client in onlineClients:
         recvName = onlineClients[client]
-        if name == "Server":
+        if name == "SERVER":
             if recvName in clients[thisClientName].getblacklist():
                 continue
         else:
@@ -257,18 +266,18 @@ def isBlocked(recv, send):
 def startPrivate(name, thisClient):
     thisClientName = onlineClients[thisClient]
     if name == thisClientName:
-            thisClient.send(bytes(f"Can't connect to {name} as this user is YOU", "utf8"))   
+            thisClient.send(bytes(svr + f"Can't connect to {name} as this user is YOU", "utf8"))   
             return
     for client in onlineClients:
         if onlineClients[client] == name:
             if isBlocked(name, thisClientName):
-                thisClient.send(bytes(f"Can't connect to {name} as this user has blocked you", "utf8"))
+                thisClient.send(bytes(svr + f"Can't connect to {name} as this user has blocked you", "utf8"))
             else:
                 addr = addresses[client]
                 thisClient.send(bytes(f"[IP,PORT] {name} {addr}", "utf8"))
             return
     # End of for loop with no return impliess user not online
-    thisClient.send(bytes(f"Can't connect to {name} as this user is offline or does not exist", "utf8"))    
+    thisClient.send(bytes(svr + f"Can't connect to {name} as this user is offline or does not exist", "utf8"))    
 
 def inonline(name):
     for client in onlineClients:
@@ -299,7 +308,7 @@ def activateClock():
                 if timeTimeout > TIMEOUT:
                     for client in onlineClients:
                         if onlineClients[client] == clientDets.getname():
-                            client.send(bytes("You have timed out", "utf8"))
+                            client.send(bytes(svr + "You have timed out", "utf8"))
                             buffer.sleep(1)
                             client.send(bytes("[logout]", "utf8"))
                             client.close

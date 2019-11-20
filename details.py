@@ -54,10 +54,18 @@ class ClientDetails():
         return self.blacklist
 
     def addblacklist(self, name):
-        self.blacklist.append(name)
+        if name not in self.blacklist:
+            self.blacklist.append(name)
+            return True
+        else:
+            return False
 
     def removeblacklist(self, name):
-        self.blacklist.remove(name)
+        if name in self.blacklist:
+            self.blacklist.remove(name)
+            return True
+        else:
+            return False
 
     # STORED MESSAGES
     def getstoredmsg(self):

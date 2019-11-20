@@ -32,21 +32,24 @@ client_socket.connect(ADDR)
 # Sends Server ADDR I'm listening on
 client_socket.send(bytes(f"{SVRADDR[0]} {SVRADDR[1]}", "utf8"))
 username = ""
+loggedin = False
 
 readables = [sys.stdin, client_socket, cServer_socket]
 
 while True:
-   
+    
     read, write, error = select.select(readables,[],[])
-
+    
     for sock in read:
         # Implies message from Server
         if sock == client_socket:
             msg = sock.recv(BUFFSIZE).decode("utf8").strip()
             tag = msg.split(None, 1)[0].strip()
 
+            # Successful login
             if tag == "[yourName]":
                 username = msg.split(None, 1)[1]
+                loggedin = True
             # Implies user wants to logout
             elif tag == "[logout]":
                 client_socket.shutdown(SHUT_RDWR)
@@ -84,7 +87,8 @@ while True:
             # print(pteClientName)
         # Read from std in
         elif sock == sys.stdin:
-            line = sys.stdin.readline()
+            # line = sys.stdin.readline()
+            line = input()
             if line.split(None, 1)[0] == "private":
                 user = line.split(None, 3)[1]
                 msg = line.split(None, 3)[2]
@@ -102,7 +106,7 @@ while True:
                     print(f"Successfully storped private connection to {user}")
                 else:
                     print(f"No existing private connection to {user}")
-            else:    
+            else:
                 client_socket.send(bytes(f"{line}", "utf8"))
         # Other sockets in the list (created by p2p connections)
         else:
